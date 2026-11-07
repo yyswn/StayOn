@@ -15,7 +15,7 @@ No timers, no presets, no account, and nothing to configure.
 ![Swift](https://img.shields.io/badge/Swift-5-orange)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-[**Download**](https://github.com/yyswn/StayOn/releases/latest) · [How it works](#how-it-works) · [Safety](#safety) · [Build from source](#build-from-source)
+[**Download**](https://github.com/yyswn/StayOn/releases) · [How it works](#how-it-works) · [Safety](#safety) · [Build from source](#build-from-source)
 
 | Off | On |
 | :---: | :---: |
@@ -38,7 +38,7 @@ macOS sleeps when you close the lid, which stops your downloads, builds, servers
 
 ## Install
 
-1. Download `StayOn.dmg` from the [latest release](https://github.com/yyswn/StayOn/releases/latest).
+1. Download `StayOn.dmg` from the [releases page](https://github.com/yyswn/StayOn/releases).
 2. Open it and drag **StayOn** to **Applications**.
 3. Open StayOn. A moon appears in your menu bar.
 
