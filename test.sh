@@ -62,8 +62,11 @@ reset() { # initial state
   echo "$1" > "$ROOT/state"
   echo boot-A > "$ROOT/boot"
   echo "90 power" > "$ROOT/battery"
+  echo 0.7 > "$ROOT/brightness"
   touch "$ROOT/calls"
 }
+bright_is() { [[ "$(cat "$ROOT/brightness")" == "$1" ]]; }
+no_saved_brightness() { [[ ! -e "$ROOT/support/brightness" ]]; }
 start() { STAYON_TEST_ROOT="$ROOT" "$BIN" >/dev/null 2>&1 & PID=$!; expect "app started" "[[ -e '$ROOT/ui' ]]"; }
 stop() { [[ -n "$PID" ]] && { kill -TERM "$PID" 2>/dev/null; wait "$PID" 2>/dev/null; }; PID=""; }
 crash() { kill -KILL "$PID"; wait "$PID" 2>/dev/null; PID=""; }
@@ -78,21 +81,39 @@ click; expect "second click turns off" is_off
 echo "Lid closes while on"
 reset 0; start; click; expect "on" is_on
 touch "$ROOT/lid_closed"
-expect "screen is turned off" "grep -q display '$ROOT/calls'"
+expect "screen dims to black" "bright_is 0.0"
 holds "Mac stays on with the lid closed" is_on
-holds "screen-off is requested only once" "[[ \$(grep -c display '$ROOT/calls') == 1 ]]"
-rm "$ROOT/lid_closed"; holds "stays on when the lid opens" is_on
+holds "display is never switched off (remote desktop keeps working)" "! grep -q display '$ROOT/calls'"
+echo 0.4 > "$ROOT/brightness"
+expect "dims again if macOS turns brightness up" "bright_is 0.0"
+rm "$ROOT/lid_closed"
+expect "lid opens: brightness restored" "bright_is 0.7 && no_saved_brightness"
+holds "stays on when the lid opens" is_on
 
 echo "Lid closes while off"
 reset 0; start
-touch "$ROOT/lid_closed"; holds "screen-off is not requested" "! grep -q display '$ROOT/calls'"
+touch "$ROOT/lid_closed"; holds "brightness untouched" "bright_is 0.7 && no_saved_brightness"
 
 echo "Turning off with the lid closed asks first"
 reset 0; start; click; expect "on" is_on
-touch "$ROOT/lid_closed"
+touch "$ROOT/lid_closed"; expect "dark" "bright_is 0.0"
 click; holds "Keep On leaves it on" is_on
 touch "$ROOT/confirm_turn_off"
 click; expect "Turn Off turns it off" is_off
+rm "$ROOT/lid_closed"; expect "brightness restored when the lid opens" "bright_is 0.7"
+
+echo "Quit with the lid closed"
+reset 0; start; click; expect "on" is_on
+touch "$ROOT/lid_closed"; expect "dark" "bright_is 0.0"
+stop
+expect "quitting restores brightness and sleep" "bright_is 0.7 && no_saved_brightness && state_is 0"
+
+echo "Crash with the lid closed"
+reset 0; start; click; expect "on" is_on
+touch "$ROOT/lid_closed"; expect "dark" "bright_is 0.0"
+crash; start
+holds "stays on and dark after relaunch" "is_on && bright_is 0.0"
+rm "$ROOT/lid_closed"; expect "lid opens: brightness restored" "bright_is 0.7 && no_saved_brightness"
 
 echo "Battery floor"
 reset 0; start; click; expect "on" is_on

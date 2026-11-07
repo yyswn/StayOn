@@ -32,7 +32,7 @@ macOS sleeps when you close the lid, which stops your downloads, builds, servers
 
 - **One click.** Click the icon to turn it on, and click again to turn it off.
 - **No timer.** It stays on until you say otherwise.
-- **Works with the lid closed.** The screen turns off to save power while everything else keeps running.
+- **Works with the lid closed.** The screen dims to black while everything else keeps running, including remote desktop apps like RustDesk.
 - **Hard to get wrong.** It warns you before actions that would sleep the Mac and cut remote connections, and it steps in on low battery or critical heat.
 - **Small and readable.** One Swift file with no dependencies, no network access and no analytics.
 
@@ -71,7 +71,8 @@ The icon always shows the real system setting, so it can't drift out of sync wit
 
 | Event | What StayOn does |
 | --- | --- |
-| Lid closes while on | Turns the screen off and keeps the Mac running |
+| Lid closes while on | Dims the screen to black and keeps the Mac running. The display stays on, so remote desktop apps can still capture it |
+| Lid opens | Restores your brightness |
 | You turn it off with the lid closed | Asks first, because the Mac will sleep right away |
 | You quit | Restores normal sleep if StayOn turned it off |
 | StayOn crashes | Keeps the session when reopened |

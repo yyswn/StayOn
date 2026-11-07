@@ -141,6 +141,72 @@ enum Marker {
     static func remove() { try? FileManager.default.removeItem(at: url) }
 }
 
+// MARK: - Screen brightness
+
+/// With the lid closed, StayOn dims the built-in screen to black instead of
+/// switching the display off. Remote desktop apps like RustDesk need the display
+/// to stay on so they can capture it. The brightness to restore is saved to a
+/// file, so a crash never leaves the screen black.
+enum Backlight {
+    static let savedURL = Marker.url.deletingLastPathComponent().appendingPathComponent("brightness")
+
+    #if TESTMODE
+    static func get() -> Float? { testValue("brightness").flatMap(Float.init) }
+    static func set(_ value: Float) {
+        try? "\(value)".write(toFile: "\(testRoot)/brightness", atomically: true, encoding: .utf8)
+    }
+    #else
+    // DisplayServices is a private framework. If it ever goes missing, StayOn simply skips dimming.
+    private typealias GetFunction = @convention(c) (CGDirectDisplayID, UnsafeMutablePointer<Float>) -> Int32
+    private typealias SetFunction = @convention(c) (CGDirectDisplayID, Float) -> Int32
+    private static let library = dlopen(
+        "/System/Library/PrivateFrameworks/DisplayServices.framework/DisplayServices", RTLD_LAZY)
+    private static let getFunction = library.flatMap { dlsym($0, "DisplayServicesGetBrightness") }
+        .map { unsafeBitCast($0, to: GetFunction.self) }
+    private static let setFunction = library.flatMap { dlsym($0, "DisplayServicesSetBrightness") }
+        .map { unsafeBitCast($0, to: SetFunction.self) }
+
+    private static var builtInDisplay: CGDirectDisplayID? {
+        var displays = [CGDirectDisplayID](repeating: 0, count: 16)
+        var count: UInt32 = 0
+        guard CGGetOnlineDisplayList(16, &displays, &count) == .success else { return nil }
+        return displays.prefix(Int(count)).first { CGDisplayIsBuiltin($0) != 0 }
+    }
+
+    static func get() -> Float? {
+        guard let display = builtInDisplay, let getFunction else { return nil }
+        var value: Float = 0
+        return getFunction(display, &value) == 0 ? value : nil
+    }
+
+    static func set(_ value: Float) {
+        guard let display = builtInDisplay, let setFunction else { return }
+        _ = setFunction(display, value)
+    }
+    #endif
+
+    static var saved: Float? {
+        (try? String(contentsOf: savedURL, encoding: .utf8))
+            .flatMap { Float($0.trimmingCharacters(in: .whitespacesAndNewlines)) }
+    }
+
+    static func darken(remembering value: Float) {
+        try? FileManager.default.createDirectory(
+            at: savedURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try? "\(value)".write(to: savedURL, atomically: true, encoding: .utf8)
+        set(0)
+    }
+
+    /// Puts the saved brightness back. Returns it, or nil if nothing was saved.
+    @discardableResult
+    static func restore() -> Float? {
+        guard let value = saved else { return nil }
+        set(value)
+        try? FileManager.default.removeItem(at: savedURL)
+        return value
+    }
+}
+
 // MARK: - App
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
@@ -161,8 +227,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var isOn = false
     private var busy = false
     private var note: String?
-    private var lidWasClosed = lidIsClosed()
     private var ticks = 0
+    /// The latest brightness seen with the lid open. macOS starts dimming as the
+    /// lid closes, so reading it at that moment would save the wrong value.
+    private var openBrightness: Float?
+    /// macOS sometimes resets brightness right after the lid opens, so restore twice.
+    private var restoredBrightness: Float?
     /// You turned StayOn on while already below the floor, so don't undo that.
     private var floorOverride = false
     private var timer: Timer?
@@ -208,6 +278,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        Backlight.restore()
         worker.sync {
             guard Marker.exists else { return }
             if setSleepDisabled(false) { Marker.remove() }
@@ -331,11 +402,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func tick() {
         let closed = lidIsClosed()
-        if isOn && closed && !lidWasClosed {
-            // Lid just closed: turn the screen off to save battery. The Mac keeps running.
-            worker.async { run(pmsetPath, ["displaysleepnow"]) }
+        if closed {
+            restoredBrightness = nil
+            if isOn {
+                // Dim to black rather than switching the display off, so remote desktop apps keep working.
+                if Backlight.saved == nil {
+                    if let brightness = openBrightness ?? Backlight.get() { Backlight.darken(remembering: brightness) }
+                } else if let brightness = Backlight.get(), brightness > 0.01 {
+                    Backlight.set(0)   // macOS turned it back up.
+                }
+            }
+        } else if let restored = Backlight.restore() {
+            restoredBrightness = restored
+        } else if let restored = restoredBrightness {
+            Backlight.set(restored)
+            restoredBrightness = nil
+        } else if let brightness = Backlight.get(), brightness > 0.01 {
+            openBrightness = brightness
         }
-        lidWasClosed = closed
 
         ticks += 1
         if ticks % 5 == 0 { refresh() }
