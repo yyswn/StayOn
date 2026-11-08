@@ -23,9 +23,6 @@ No timers, no presets, no account, and nothing to configure.
 
 </div>
 
-> [!NOTE]
-> **Early release.** All automated logic tests pass, but closing the lid on real hardware has not been fully verified yet. Keep an eye on it the first few times, and please [report anything odd](https://github.com/yyswn/StayOn/issues).
-
 ## Why StayOn?
 
 macOS sleeps when you close the lid, which stops your downloads, builds, servers and remote sessions. StayOn does one job: it turns that off until you turn it back on.
