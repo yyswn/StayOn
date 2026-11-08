@@ -70,8 +70,8 @@ The icon always shows the real system setting, so it can't drift out of sync wit
 | --- | --- |
 | Lid closes while on | Dims the screen to black and keeps the Mac running. The display stays on, so remote desktop apps can still capture it |
 | Lid opens | Restores your brightness |
-| You turn it off with the lid closed | Asks first, because the Mac will sleep right away |
-| You quit | Restores normal sleep if StayOn turned it off |
+| You turn it off with the lid closed | Asks first, then puts the Mac to sleep (remote sessions drop) |
+| You quit | Restores normal sleep if StayOn turned it off, and sleeps the Mac if the lid is closed |
 | StayOn crashes | Keeps the session when reopened |
 | Mac restarts | Goes back to off the next time StayOn opens |
 | Another app changes the setting | Follows the change, and never undoes a hold it didn't create |

@@ -16,6 +16,7 @@ case "\$*" in
   "-a disablesleep 0") echo 0 > "$ROOT/state"; echo off >> "$ROOT/calls" ;;
   "-a disablesleep 1") echo 1 > "$ROOT/state"; echo on >> "$ROOT/calls" ;;
   displaysleepnow) echo display >> "$ROOT/calls" ;;
+  sleepnow) echo sleepnow >> "$ROOT/calls" ;;
   *) echo "unexpected: \$*" >> "$ROOT/calls"; exit 1 ;;
 esac
 EOF
@@ -77,6 +78,7 @@ reset 0; start
 expect "starts off" is_off
 click; expect "click turns on" is_on
 click; expect "second click turns off" is_off
+holds "lid open: does not sleep the Mac" "! grep -q sleepnow '$ROOT/calls'"
 
 echo "Lid closes while on"
 reset 0; start; click; expect "on" is_on
@@ -100,6 +102,7 @@ touch "$ROOT/lid_closed"; expect "dark" "bright_is 0.0"
 click; holds "Keep On leaves it on" is_on
 touch "$ROOT/confirm_turn_off"
 click; expect "Turn Off turns it off" is_off
+expect "and puts the Mac to sleep" "grep -q sleepnow '$ROOT/calls'"
 rm "$ROOT/lid_closed"; expect "brightness restored when the lid opens" "bright_is 0.7"
 
 echo "Quit with the lid closed"
@@ -107,6 +110,7 @@ reset 0; start; click; expect "on" is_on
 touch "$ROOT/lid_closed"; expect "dark" "bright_is 0.0"
 stop
 expect "quitting restores brightness and sleep" "bright_is 0.7 && no_saved_brightness && state_is 0"
+expect "and puts the Mac to sleep" "grep -q sleepnow '$ROOT/calls'"
 
 echo "Crash with the lid closed"
 reset 0; start; click; expect "on" is_on
@@ -120,6 +124,11 @@ reset 0; start; click; expect "on" is_on
 echo "11 battery" > "$ROOT/battery"; holds "stays on at 11%" is_on
 echo "10 battery" > "$ROOT/battery"; expect "turns off at 10%" is_off
 expect "says why" "grep -q 'battery reached 10%' '$ROOT/ui'"
+
+echo "Battery floor with the lid closed"
+reset 0; start; click; expect "on" is_on
+touch "$ROOT/lid_closed"; echo "10 battery" > "$ROOT/battery"
+expect "turns off and puts the Mac to sleep" "is_off && grep -q sleepnow '$ROOT/calls'"
 
 echo "Battery floor is ignored on the charger"
 reset 0; start; click; expect "on" is_on

@@ -61,6 +61,13 @@ func setSleepDisabled(_ disabled: Bool) -> Bool {
     run(sudoPath, ["-n", pmsetPath, "-a", "disablesleep", disabled ? "1" : "0"]).status == 0
 }
 
+/// macOS only checks for clamshell sleep when the lid closes, so turning sleep
+/// back on with the lid already closed would leave the Mac running. This sleeps it.
+/// Needs no admin rights.
+func sleepIfLidClosed() {
+    if lidIsClosed() { run(pmsetPath, ["sleepnow"]) }
+}
+
 /// Asks for the admin password once and installs a sudo rule that allows only
 /// the two exact commands StayOn runs.
 func installSudoRule() -> Bool {
@@ -278,10 +285,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        // Waiting for pmset spins the run loop, and a late tick would dim the screen again.
+        timer?.invalidate()
         Backlight.restore()
         worker.sync {
             guard Marker.exists else { return }
-            if setSleepDisabled(false) { Marker.remove() }
+            if setSleepDisabled(false) {
+                Marker.remove()
+                sleepIfLidClosed()
+            }
         }
     }
 
@@ -316,6 +328,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         worker.async {
             let succeeded = self.apply(on)
             let actual = sleepIsDisabled()
+            if !on && succeeded { sleepIfLidClosed() }
             DispatchQueue.main.async {
                 self.busy = false
                 self.isOn = actual ?? self.isOn
